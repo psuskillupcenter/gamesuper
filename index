@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Super Engineer วิ่งกระโดด</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f3ead6;--ink:#2a2233;--soft:#6b5f73;--accent:#3b44c4;--panel:#fffaf0;--line:#d9c9a6;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17141d;--ink:#f1e6c8;--soft:#a89cb0;--accent:#9aa2ff;--panel:#221d2b;--line:#3a3245;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#17141d;--ink:#f1e6c8;--soft:#a89cb0;--accent:#9aa2ff;--panel:#221d2b;--line:#3a3245;color-scheme:dark}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Chakra Petch","Noto Sans Thai",Tahoma,sans-serif;min-height:100%}
+main{max-width:720px;margin:0 auto;padding:20px 16px 32px}
+h1{font-size:clamp(22px,6vw,32px);font-weight:600;margin:4px 0 4px;letter-spacing:.01em}
+.sub{color:var(--soft);margin:0 0 16px;font-size:15px}
+.stage{position:relative;border:3px solid var(--ink);border-radius:6px;overflow:hidden;background:#bfe3f5;touch-action:manipulation;user-select:none;-webkit-user-select:none;cursor:pointer}
+canvas{display:block;width:100%;image-rendering:pixelated;image-rendering:crisp-edges}
+.hud{display:flex;justify-content:space-between;align-items:baseline;margin-top:12px;font-size:16px}
+.hud b{font-weight:600;font-variant-numeric:tabular-nums}
+.overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.overlay span{background:rgba(42,34,51,.82);color:#f1e6c8;padding:8px 14px;border-radius:4px;font-size:clamp(14px,4vw,18px)}
+.help{margin-top:18px;padding:14px 16px;background:var(--panel);border:1px solid var(--line);border-radius:6px;font-size:15px;line-height:1.7;color:var(--soft)}
+.help strong{color:var(--ink);font-weight:600}
+button{font:inherit;color:var(--ink);background:transparent;border:2px solid var(--ink);border-radius:4px;padding:6px 14px;cursor:pointer}
+button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+</style>
+</head>
+<body>
+<main>
+<h1>Super Engineer วิ่งกระโดด</h1>
+<p class="sub">วิ่งฝ่าทะเลทราย กระโดดข้ามกระบองเพชรให้ได้ไกลที่สุด</p>
+<div class="stage" id="stage" role="button" tabindex="0" aria-label="แตะเพื่อกระโดด">
+<canvas id="c" width="160" height="64"></canvas>
+<div class="overlay"><span id="msg">แตะเพื่อเริ่มเล่น</span></div>
+</div>
+<div class="hud">
+<span>คะแนน <b id="sc">0</b></span>
+<span>สถิติสูงสุด <b id="hi">0</b></span>
+</div>
+<div class="help"><strong>วิธีเล่น:</strong> แตะที่ฉากเกม หรือกดปุ่ม Space / ลูกศรขึ้นบนคีย์บอร์ด เพื่อกระโดด ยิ่งวิ่งนาน ความเร็วก็ยิ่งเพิ่มขึ้น ชนกระบองเพชรเมื่อไหร่ก็แตะเพื่อเริ่มใหม่ได้ทันที</div>
+</main>
+<script>
+(function(){
+const cv=document.getElementById('c'),x=cv.getContext('2d'),stage=document.getElementById('stage');
+const msg=document.getElementById('msg'),scEl=document.getElementById('sc'),hiEl=document.getElementById('hi');
+const col={H:'#1b1b1f',S:'#e9b98e',G:'#2b2b30',R:'#b0604e',J:'#f1e6c8',j:'#d8c9a3',B:'#3b44c4',P:'#7d3aa8',L:'#cfd6e6',D:'#26314d',K:'#1a1a1a'};
+const body=["...HHHHHH...","..HHHHHHHH..","..HSSSSSSH..","..GGGSGGGS..","..SGSSSGSS..","...SSRRSS...","....SSSS....","..JJBBBBjJ..",".JJJBLBBJJJ.",".JJJBLBBJjJ.",".SJJPLPPJJS.","..JjPPPPJJ..","...DDDDDD..."];
+const runA=["...DD..DD...","..DD....DD..",".KK......KK."];
+const runB=["....DDDD....","....DDDD....","....KKKK...."];
+const jmp=["..DDD..DDD..",".DD......DD.",".K........K."];
+function spr(rows,ox,oy){for(let i=0;i<rows.length;i++){const r=rows[i];for(let k=0;k<r.length;k++){const c=r[k];if(c!=='.'){x.fillStyle=col[c];x.fillRect(ox+k,oy+i,1,1);}}}}
+const GY=52,PX=14;
+let hi=0;try{hi=parseInt(localStorage.getItem('pr-hi')||'0',10)||0;}catch(e){}
+hiEl.textContent=hi;
+let py,vy,cacti,clouds,speed,score,state,t,demo=true;
+function reset(){py=GY-16;vy=0;cacti=[{x:170,h:10,w:5}];clouds=[{x:30,y:10},{x:110,y:16},{x:72,y:6}];speed=1.3;score=0;t=0;}
+reset();state='demo';msg.textContent='แตะเพื่อเริ่มเล่น';
+function jump(){if(py>=GY-16){vy=-3.3;}}
+function press(){
+if(state==='demo'){reset();state='play';demo=false;msg.parentNode.style.display='none';jump();return;}
+if(state==='dead'){reset();state='play';msg.parentNode.style.display='none';return;}
+jump();}
+stage.addEventListener('pointerdown',e=>{e.preventDefault();press();});
+window.addEventListener('keydown',e=>{if(e.code==='Space'||e.code==='ArrowUp'){e.preventDefault();press();}});
+function cactus(c){x.fillStyle='#3f8f2e';x.fillRect(c.x+1,GY-c.h,c.w-2,c.h);x.fillRect(c.x-1,GY-c.h+3,2,4);x.fillRect(c.x+c.w-1,GY-c.h+2,2,4);x.fillStyle='#56b23f';x.fillRect(c.x+2,GY-c.h+1,1,c.h-2);}
+function frame(){
+t++;
+x.fillStyle='#bfe3f5';x.fillRect(0,0,160,64);
+x.fillStyle='#ffe08a';x.fillRect(138,6,8,8);x.fillStyle='#fff3c4';x.fillRect(140,8,4,4);
+x.fillStyle='#ffffff';
+for(const c of clouds){x.fillRect(Math.round(c.x),c.y,14,3);x.fillRect(Math.round(c.x)+3,c.y-2,7,2);if(state!=='dead')c.x-=0.2;if(c.x<-16)c.x=165;}
+x.fillStyle='#e8c98a';x.fillRect(0,GY,160,12);x.fillStyle='#c9a25e';x.fillRect(0,GY,160,1);
+for(let i=0;i<12;i++){const gx=((i*17-t*speed)%170+170)%170-5;x.fillRect(Math.round(gx),GY+4+(i%3)*2,2,1);}
+if(state!=='dead'){
+vy+=0.22;py+=vy;if(py>GY-16){py=GY-16;vy=0;}
+for(const c of cacti)c.x-=speed;
+if(cacti.length&&cacti[0].x<-8)cacti.shift();
+const last=cacti[cacti.length-1];
+if(!last||last.x<160-(55+Math.random()*60))cacti.push({x:165,h:8+Math.floor(Math.random()*6),w:4+Math.floor(Math.random()*3)});
+if(state==='demo'){const n=cacti.find(c=>c.x+c.w>PX+6);if(n&&n.x-(PX+8)<speed*9&&n.x>PX+6)jump();}
+else{
+for(const c of cacti){if(c.x<PX+12&&c.x+c.w>PX+3&&py+15>GY-c.h){state='dead';}}
+score++;speed=1.3+score/1500;
+const s=Math.floor(score/5);scEl.textContent=s;
+if(state==='dead'){if(s>hi){hi=s;hiEl.textContent=hi;try{localStorage.setItem('pr-hi',String(hi));}catch(e){}}
+msg.textContent='ชนแล้ว! แตะเพื่อเริ่มใหม่';msg.parentNode.style.display='flex';}
+}}
+for(const c of cacti)cactus(c);
+const oy=Math.round(py);
+spr(body,PX,oy);
+spr(py<GY-16?jmp:(Math.floor(t/6)%2?runA:runB),PX,oy+13);
+requestAnimationFrame(frame);}
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
